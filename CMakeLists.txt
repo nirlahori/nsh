@@ -23,4 +23,5 @@ add_executable(${CMAKE_PROJECT_NAME} ${SRCS}
     src/word_control.hpp
     src/execution/command_execution.cpp src/execution/command_execution.hpp
     src/execution/command_execution.cpp src/execution/command_execution.hpp
-    src/execution/builtin.hpp)
+    src/execution/builtin.hpp
+    README.md)
