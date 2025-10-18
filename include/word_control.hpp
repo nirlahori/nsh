@@ -64,11 +64,4 @@ void expand_cmdline_envs(std::map<std::string, std::string>& envs){
 
 }
 
-
-
-
-
-
-
-
 #endif // WORD_CONTROL_HPP

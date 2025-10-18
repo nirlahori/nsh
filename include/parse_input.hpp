@@ -6,9 +6,16 @@
 #include <cstring>
 #include <vector>
 #include <sstream>
+#include <algorithm>
+#include <iterator>
+#include <cctype>
+#include <algorithm>
+#include <iostream>
+#include <utility>
 
 #include "command_struct.hpp"
 
+#include <unistd.h>
 
 namespace parse{
 
@@ -81,8 +88,7 @@ std::map<std::string, std::string> extract_env_vars(const std::list<std::string>
 }
 
 
-
-std::list<command_info> extract_commands(const std::list<std::string>& tokens){
+std::list<command_info> extract_commands(std::list<std::string>& tokens){
 
     std::list<command_info> cmds_list;
     int ctok{0};
@@ -97,14 +103,18 @@ std::list<command_info> extract_commands(const std::list<std::string>& tokens){
         envs = extract_env_vars(cmdtokens, ctok);
         cinfo.envs = std::move(envs);
 
-        //expand_cmdline_envs(cinfo.envs);
+        if(ctok != 0){
+            cmdtokens.erase(cmdtokens.begin(), std::next(cmdtokens.begin(), ctok));
+        }
 
-        const auto& iter {std::next(cmdtokens.cbegin(), ctok)};
-        cinfo.execfile = *iter;
+        // Check if the input is an assignment, parse it appropriately
+
+        cinfo.execfile = std::exchange(cmdtokens.front(), "");
+        cmdtokens.erase(cmdtokens.begin());
 
         // CRITICAL: EXTRACT ARGUMENTS
 
-        std::copy(std::next(cmdtokens.begin(), ctok+1), cmdtokens.end(), std::back_inserter(cinfo.cmdargs));
+        std::move(cmdtokens.begin(), cmdtokens.end(), std::back_inserter(cinfo.cmdargs));
         //expand_cmdline_args(cinfo.cmdargs);
         cmds_list.push_back(cinfo);
 
