@@ -1,8 +1,4 @@
-#include "execution/command_execution.hpp"
-#include <unistd.h>
-#include <sys/ioctl.h>
-#include <fcntl.h>
-
+#include "../include/execution/command_execution.hpp"
 
 
 int main(int argc, char* argv[]){

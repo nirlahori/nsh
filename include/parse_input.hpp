@@ -4,7 +4,6 @@
 #include <string>
 #include <list>
 #include <cstring>
-#include <vector>
 #include <sstream>
 #include <algorithm>
 #include <iterator>
@@ -13,9 +12,9 @@
 #include <iostream>
 #include <utility>
 
-#include "command_struct.hpp"
-
 #include <unistd.h>
+
+#include "command_struct.hpp"
 
 namespace parse{
 

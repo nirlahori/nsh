@@ -9,12 +9,12 @@
 #include <sys/wait.h>
 #include <fcntl.h>
 
-#include "command_execution.hpp"
-#include "../tokens.hpp"
-#include "../parse_input.hpp"
-#include "../word_control.hpp"
-#include "../system_envs.hpp"
-#include "job_control.h"
+#include "../../include/tokens.hpp"
+#include "../../include/parse_input.hpp"
+#include "../../include/word_control.hpp"
+#include "../../include/system_envs.hpp"
+#include "../../include/execution/command_execution.hpp"
+#include "../../include/execution/job_control.hpp"
 
 
 

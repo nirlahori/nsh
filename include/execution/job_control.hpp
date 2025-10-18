@@ -5,14 +5,13 @@
 #include <string>
 #include <map>
 #include <list>
-#include <cstdint>
 
 #include <unistd.h>
 #include <sys/wait.h>
 
 #include "../command_struct.hpp"
 #include "../c_array.hpp"
-#include "job_control_impl.hpp"
+#include "internal/job_control_impl.hpp"
 
 
 class Job_Control
