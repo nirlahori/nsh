@@ -42,7 +42,13 @@ Run the nsh to start the nsh shell.
 
     cat /etc/passwd | cut -d: -f1 | sort | uniq | grep root
 
-    sleep 10 &    
+    sleep 10 &
+
+
+# Screenshots
+
+    ![Simple Pipeline](images/simple_pipeline.png)
+    
 
 # License
 This project is released as a personal learning project and is not intended for production use.
