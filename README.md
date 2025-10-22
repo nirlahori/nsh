@@ -47,8 +47,17 @@ Run the nsh to start the nsh shell.
 
 # Screenshots
 
+Simple Pipelines
+
 ![Simple Pipeline](images/simple_pipeline.png)
+
+fg Command Example
+
 ![fg Command Example](images/fg_command_demo.png)
+
+
+Simple Background Job
+
 ![Simple Background Job](images/simple_background_job.png)
 
     
