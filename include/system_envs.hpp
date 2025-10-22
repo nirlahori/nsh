@@ -32,7 +32,7 @@ bool init_env(){
 }
 
 
-bool register_new_env(std::string_view name, std::string_view value){
+bool register_new_env(const std::string& name, const std::string& value){
 
     if(setenv(name.data(), value.data(), 1) < 0){
         return false;
@@ -41,11 +41,13 @@ bool register_new_env(std::string_view name, std::string_view value){
     return true;
 }
 
+std::string get_env(const std::string& name){
 
-
-
-
-
+    if(envmap.contains(name)){
+        return envmap.at(name);
+    }
+    return std::string();
+}
 }
 
 
