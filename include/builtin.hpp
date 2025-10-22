@@ -216,6 +216,8 @@ struct builtin_fg : public builtin_base{
 
         if(arglist.empty()){
             auto iter = std::prev(bgjob_table.end());
+
+            // Hand over the terminal device to the foreground job
             if(set_fg_job(iter->second.pgid) < 0){
                 std::printf("Error executing fg\n");
             }
@@ -230,6 +232,8 @@ struct builtin_fg : public builtin_base{
                         std::perror("Error");
                     }
                 }
+
+                // Hand over the terminal device to the shell
                 if(signal(SIGTTOU, SIG_IGN) == SIG_ERR){
                     std::perror("Error");
                 }
@@ -237,6 +241,9 @@ struct builtin_fg : public builtin_base{
                 if(signal(SIGTTOU, SIG_DFL) == SIG_ERR){
                     std::perror("Error");
                 }
+
+                // Remove job from background job table
+                bgjob_table.erase(iter);
             }
         }
         else{
@@ -258,6 +265,8 @@ struct builtin_fg : public builtin_base{
                                     std::perror("Error");
                                 }
                             }
+
+                            // Hand over the terminal device to the shell
                             if(signal(SIGTTOU, SIG_IGN) == SIG_ERR){
                                 std::perror("Error");
                             }
@@ -265,10 +274,13 @@ struct builtin_fg : public builtin_base{
                             if(signal(SIGTTOU, SIG_DFL) == SIG_ERR){
                                 std::perror("Error");
                             }
+
+                            // Remove job from background job table
+                            bgjob_table.erase(iter);
                         }
                     }
                     else{
-                        std::printf("Error executing fg\n");
+                        std::printf("Error executing fg: No such job\n");
                     }
                 }
                 catch(...){
@@ -276,9 +288,11 @@ struct builtin_fg : public builtin_base{
                 }
             }
             else{
-                std::printf("Error executing fg\n");
+                std::printf("Error executing fg: No such job\n");
             }
         }
+
+
     }
 
     ~builtin_fg(){}

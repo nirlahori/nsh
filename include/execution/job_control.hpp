@@ -5,6 +5,7 @@
 #include <string>
 #include <map>
 #include <list>
+#include <csignal>
 
 #include <unistd.h>
 #include <sys/wait.h>
@@ -16,6 +17,10 @@
 
 class Job_Control
 {
+
+    bool tokenize_path_var(std::list<std::string>& path_dirs);
+    void set_foreground_pgid(std::size_t pgid);
+
     std::map<std::size_t, background_execution_unit> bgjob_table;
     std::size_t jobunit_id;
 
@@ -29,17 +34,12 @@ class Job_Control
     int shell_pid;
     int shell_pgid;
 
-
     bool single_proc_flag {false};
-
     c_array arglist;
 
+    std::list<std::string> path_dirs;
 
-
-private:
-
-    void set_foreground_pgid(std::size_t pgid);
-
+    void handle(int, siginfo_t*, void*);
 
 public:
     void submit_foreground_jobs(const std::list<job_type>& _fg_jobs);

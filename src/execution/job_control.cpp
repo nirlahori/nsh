@@ -1,30 +1,17 @@
 #include <list>
 #include <algorithm>
 #include <string>
+#include <string_view>
 #include <cstring>
 
 #include "../../include/execution/job_control.hpp"
 #include "../../include/builtin.hpp"
 
-static bool tokenize_path_var(std::list<std::string>& path_dirs){
+#define set_signal(sigobj, signum, action) \
+    sigobj.sa_handler = action; \
+    sigaction(signum, &sa_intr, nullptr);
 
-    char* delim  {":"};
 
-    char* path_env_val {getenv("PATH")};
-    if(!path_env_val)
-        return false;
-
-    char path_dir_toks[std::strlen(path_env_val) + 1];
-
-    memcpy(path_dir_toks, path_env_val, std::strlen(path_env_val) + 1);
-
-    char* tok {std::strtok(path_dir_toks, delim)};
-    while(tok){
-        path_dirs.push_back(std::string(tok));
-        tok = std::strtok(nullptr, delim);
-    }
-    return true;
-}
 
 Job_Control::Job_Control() :
     bgjob_table(),
@@ -34,9 +21,29 @@ Job_Control::Job_Control() :
     shell_pid{getpid()},
     shell_pgid{getpgrp()}
     {
-        builtin::init_builtin_map();
-    }
+        if(!tokenize_path_var(path_dirs)){
+            // Cannot proceed forward in case of error in getting directory list in $PATH
+            std::exit(EXIT_FAILURE);
+        }
 
+        builtin::init_builtin_map();
+
+        // Setup signal handling
+        struct sigaction sa_intr, sa_tstp;
+
+        sa_intr.sa_flags = 0;
+        if(sigemptyset(&sa_intr.sa_mask) < 0){
+            std::puts("Coudn't start shell... unknown error occurred\n");
+        }
+
+        set_signal(sa_intr, SIGINT, SIG_IGN);
+
+
+
+
+
+
+    }
 
 
 void Job_Control::set_foreground_pgid(std::size_t pgid){
@@ -53,6 +60,49 @@ void Job_Control::set_foreground_pgid(std::size_t pgid){
             std::perror("Error");
         }
     }
+}
+
+// void Job_Control::handle_sigint(Job_Control *job_context){
+
+
+
+
+// }
+
+// void Job_Control::handle_interrupt(int signum, siginfo_t *info, void *context){
+
+//     switch (signum){
+//     case SIGINT:
+
+
+//         break;
+//     default:
+//         break;
+//     }
+
+// }
+
+
+
+bool Job_Control::tokenize_path_var(std::list<std::string>& path_dirs){
+
+
+    std::string_view delim {":"};
+
+    char* path_env_val {getenv("PATH")};
+    if(!path_env_val)
+        return false;
+
+    char path_dir_toks[std::strlen(path_env_val) + 1];
+
+    memcpy(path_dir_toks, path_env_val, std::strlen(path_env_val) + 1);
+
+    char* tok {std::strtok(path_dir_toks, delim.data())};
+    while(tok){
+        path_dirs.push_back(std::string(tok));
+        tok = std::strtok(nullptr, delim.data());
+    }
+    return true;
 }
 
 void Job_Control::submit_foreground_jobs(const std::list<job_type>& _fg_jobs){
@@ -98,16 +148,12 @@ void Job_Control::run_foreground_jobs(){
             if(pid == 0){
 
                 connect_processes(no_of_pipes, pipefds, j, chain_key_size);
-                std::list<std::string> dirs;
 
                 char** procargs = arglist.get_cmdline_opt_args(curr_proc.cmdargs, curr_proc.execfile);
                 char** procenvs = arglist.get_cmdline_env_args(curr_proc.envs);
 
-                if(tokenize_path_var(dirs) == false){
-                    // Handle error
-                }
 
-                for(const std::string& path : dirs){
+                for(const std::string& path : path_dirs){
                     std::string str (path + ((path.ends_with("/")) ? curr_proc.execfile : "/" + curr_proc.execfile));
                     std::strncpy(filepath, str.c_str(), str.size() + 1);
                     execve(filepath, procargs, procenvs);
@@ -209,16 +255,11 @@ void Job_Control::run_background_jobs(){
             int pid = fork();
             if(pid == 0){
                 connect_processes(no_of_pipes, pipefds, proc_index, total_procs);
-                std::list<std::string> dirs;
 
                 char** procargs = arglist.get_cmdline_opt_args(curr_proc.cmdargs, curr_proc.execfile);
                 char** procenvs = arglist.get_cmdline_env_args(curr_proc.envs);
 
-                if(tokenize_path_var(dirs) == false){
-                    // Handle error
-                }
-
-                for(const std::string& path : dirs){
+                for(const std::string& path : path_dirs){
                     std::string str (path + ((path.ends_with("/")) ? curr_proc.execfile : "/" + curr_proc.execfile));
                     std::strncpy(filepath, str.c_str(), str.size() + 1);
                     execve(filepath, procargs, procenvs);
