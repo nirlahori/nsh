@@ -14,35 +14,29 @@
 #include "../../include/word_control.hpp"
 #include "../../include/system_envs.hpp"
 #include "../../include/execution/command_execution.hpp"
-#include "../../include/execution/job_control.hpp"
 
 
 
-#define set_signal(sigobj, signum, action) \
-    sigobj.sa_handler = action; \
-    sigaction(SIGINT, &sa_intr, nullptr);
+Command_Execution::Command_Execution() :
+    prompt_fmt {"nsh/:"},
+    prompt_suffix {" => "} {
 
-
-
-
-Command_Execution::Command_Execution() : prompt_fmt {"nsh/:"}, prompt_suffix {" => "} {
-
-    // Setup signal handling
-    struct sigaction sa_intr, sa_quit, sa_tstp;
-
-    sa_intr.sa_flags = 0;
-    if(sigemptyset(&sa_intr.sa_mask) < 0){
-        std::puts("Coudn't start shell... unknown error occurred\n");
-    }
-
-    sa_quit.sa_flags = 0;
-    if(sigemptyset(&sa_quit.sa_mask) < 0){
-        std::puts("Coudn't start shell... unknown error occurred\n");
-    }
-
-    set_signal(sa_intr, SIGINT, SIG_IGN);
-    set_signal(sa_quit, SIGQUIT, SIG_IGN);
 }
+
+// void Command_Execution::handle_interrupt(int signum, siginfo_t *info, void *context){
+//     switch(signum){
+//         case SIGINT:
+//             handle_sigint(control_unit);
+//             break;
+//         default:
+//             break;
+//     }
+// }
+
+// void Command_Execution::handle_sigint(Job_Control *job_context){
+//     // Kill the fg job
+//     // Give the control of terminal device to shell
+// }
 
 
 void Command_Execution::start_loop(){
@@ -72,8 +66,6 @@ void Command_Execution::start_loop(){
     }
 
 
-    Job_Control control_unit;
-
     while(true){
 
 
@@ -83,12 +75,15 @@ void Command_Execution::start_loop(){
 
         if(shell_cwd != cwdbuf){
             shell_cwd.assign(cwdbuf, std::strlen(cwdbuf));
-            if(shell_cwd == getenv("HOME")){
-                shell_prompt = prompt_fmt + "~" + prompt_suffix;
+
+            std::string home_dir {environment::get_env("HOME")};
+
+            auto pos = shell_cwd.find(home_dir.c_str(), 0, home_dir.length());
+            if(pos != std::string::npos){
+                shell_cwd.replace(pos, home_dir.length(), "~");
             }
-            else{
-                shell_prompt = prompt_fmt + shell_cwd + prompt_suffix;
-            }
+
+            shell_prompt = prompt_fmt + shell_cwd + prompt_suffix;
         }
 
         std::printf("%s", shell_prompt.c_str());
