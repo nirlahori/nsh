@@ -307,9 +307,9 @@ struct builtin_bg : public builtin_base{
 
     void invoke(std::list<std::string>& arglist, std::map<std::size_t, background_execution_unit>& bgjob_table){
         if(arglist.empty()){
-            auto iter = std::prev(bgjob_table.end());
+            auto iter = bgjob_table.find(bgjob_table.size());
             killpg(iter->second.pgid, SIGCONT);
-            bgjob_table[iter->second.pgid].status = job_status::running;
+            bgjob_table[iter->second.job_id].status = job_status::running;
         }
         else{
             if(arglist.front().starts_with("%")){
