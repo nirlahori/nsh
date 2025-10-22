@@ -1,6 +1,7 @@
 # nsh
 nsh is a unix shell written in C++20. The shell supports command chaining,
-foreground and background job control, shell pipelines and some other features.
+foreground and background job control, shell pipelines and some other features. 
+I have written this shell purely as a personal learning project.
 
 
 # Features implemented
