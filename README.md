@@ -47,7 +47,7 @@ Run the nsh to start the nsh shell.
 
 # Screenshots
 
-    ![Simple Pipeline](images/simple_pipeline.png)
+![Simple Pipeline](images/simple_pipeline.png)
     
 
 # License
