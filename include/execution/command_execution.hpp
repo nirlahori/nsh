@@ -3,6 +3,7 @@
 
 #include <string>
 #include <cstdio>
+#include <csignal>
 
 #include "../../include/execution/job_control.hpp"
 
@@ -14,6 +15,8 @@ class Command_Execution
 
     Job_Control control_unit;
 
+    static sig_atomic_t sigflag;
+
 public:
     Command_Execution();
 
@@ -22,8 +25,7 @@ public:
 
     void read_input();
     void start_loop();
-
-
 };
+
 
 #endif // COMMAND_EXECUTION_HPP

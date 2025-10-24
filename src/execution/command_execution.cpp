@@ -15,28 +15,43 @@
 #include "../../include/system_envs.hpp"
 #include "../../include/execution/command_execution.hpp"
 
+sig_atomic_t Command_Execution::sigflag = 0;
+
+#define set_signal(sigobj, signum, action, handler_type) \
+    sigobj.handler_type = action; \
+    sigaction(signum, &sa_intr, nullptr);
+
 
 
 Command_Execution::Command_Execution() :
     prompt_fmt {"nsh/:"},
-    prompt_suffix {" => "} {
+    prompt_suffix {" => "}  {
+        sigflag = 0;
 
+        // Setup signal handling
+        struct sigaction sa_intr, sa_tstp;
+
+        sa_intr.sa_flags = SA_SIGINFO;
+        if(sigemptyset(&sa_intr.sa_mask) < 0){
+            std::puts("Coudn't start shell... unknown error occurred\n");
+            std::exit(EXIT_FAILURE);
+        }
+
+        set_signal(sa_intr, SIGINT, handle_interrupt, sa_sigaction);
+    }
+
+void Command_Execution::handle_interrupt(int signum, siginfo_t *info, void *context){
+
+    std::printf("Signal %d caught\n", signum);
+
+    switch(signum){
+        case SIGINT:
+            sigflag = SIGINT;
+            break;
+        default:
+            break;
+    }
 }
-
-// void Command_Execution::handle_interrupt(int signum, siginfo_t *info, void *context){
-//     switch(signum){
-//         case SIGINT:
-//             handle_sigint(control_unit);
-//             break;
-//         default:
-//             break;
-//     }
-// }
-
-// void Command_Execution::handle_sigint(Job_Control *job_context){
-//     // Kill the fg job
-//     // Give the control of terminal device to shell
-// }
 
 
 void Command_Execution::start_loop(){
@@ -65,9 +80,9 @@ void Command_Execution::start_loop(){
         std::terminate();
     }
 
-
     while(true){
 
+        std::cin.clear();
 
         if(getcwd(cwdbuf, 1024) == nullptr){
             std::perror("Error");
@@ -89,6 +104,18 @@ void Command_Execution::start_loop(){
         std::printf("%s", shell_prompt.c_str());
         std::getline(std::cin, line);
 
+        if(sigflag == SIGINT){
+            int saved_errno = errno;
+            errno = 0;
+            if(!control_unit.kill_foreground_job()){
+                if(errno != 0){
+                    std::perror("Error");
+                }
+                sigflag = 0;
+            }
+            errno = saved_errno;
+        }
+
         if(line.empty()){
             control_unit.wait_for_background_jobs();
             continue;
@@ -99,8 +126,6 @@ void Command_Execution::start_loop(){
             std::puts("Unknown error occured while parsing line");
             continue;
         }
-
-
 
 
         for(std::string& cmds : proc_tokens){

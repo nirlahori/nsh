@@ -7,9 +7,7 @@
 #include "../../include/execution/job_control.hpp"
 #include "../../include/builtin.hpp"
 
-#define set_signal(sigobj, signum, action) \
-    sigobj.sa_handler = action; \
-    sigaction(signum, &sa_intr, nullptr);
+
 
 
 
@@ -27,22 +25,6 @@ Job_Control::Job_Control() :
         }
 
         builtin::init_builtin_map();
-
-        // Setup signal handling
-        struct sigaction sa_intr, sa_tstp;
-
-        sa_intr.sa_flags = 0;
-        if(sigemptyset(&sa_intr.sa_mask) < 0){
-            std::puts("Coudn't start shell... unknown error occurred\n");
-        }
-
-        set_signal(sa_intr, SIGINT, SIG_IGN);
-
-
-
-
-
-
     }
 
 
@@ -429,4 +411,20 @@ void Job_Control::wait_for_background_jobs(){
     else{
         jobunit_id = jobunit_id - to_be_removed.size();
     }
+}
+
+bool Job_Control::kill_foreground_job(){
+
+
+    // Get foreground process group id
+    int fgpgid {tcgetpgrp(STDIN_FILENO)};
+    if(fgpgid < 0 || fgpgid == getpgrp()){
+        return false;
+    }
+
+    if(killpg(fgpgid, SIGINT) < 0){
+        return false;
+    }
+
+    return true;
 }

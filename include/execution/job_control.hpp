@@ -52,7 +52,8 @@ public:
     void connect_processes(int _no_of_pipes, int pipefd[][2], const int& proc_index, const int& total_proc);
 
     void wait_for_background_jobs();
-
+    bool kill_foreground_job();
+    bool stop_foreground_job();
 
 
 public:
