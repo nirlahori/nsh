@@ -77,7 +77,7 @@ void Job_Control::execute_bg_job(job_type job){
     jobunit_id++;
     no_of_pipes = job.size() - 1;
 
-    static std::vector<std::vector<int>> pipevec(no_of_pipes);
+    static std::vector<std::vector<int>> pipevec(no_of_pipes, std::vector<int>(2));
     if(no_of_pipes > pipevec.size()){
         pipevec.resize(no_of_pipes, std::vector<int>(2));
     }
@@ -114,7 +114,7 @@ void Job_Control::execute_bg_job(job_type job){
             std::move_iterator<std::list<std::string>::iterator> first{path_dirs.begin()}, last{path_dirs.end()};
             for(; first != last; first = std::next(first)){
                 binary_file = *first;
-                binary_file.append(curr_proc.execfile);
+                binary_file.append(std::move(curr_proc.execfile));
                 execve(binary_file.string().c_str(), argsptrs.data(), envptrs.data());
             }
             std::perror("Error");
@@ -253,7 +253,7 @@ void Job_Control::run_foreground_jobs(){
                 std::move_iterator<std::list<std::string>::iterator> first{path_dirs.begin()}, last {path_dirs.end()};
                 for(; first != last; first = std::next(first)){
                     binary_file = *first;
-                    binary_file.append(curr_proc.execfile);
+                    binary_file.append(std::move(curr_proc.execfile));
                     execve(binary_file.string().c_str(), argsptrs.data(), envptrs.data());
                 }
                 std::perror("Error");
@@ -339,7 +339,6 @@ void Job_Control::run_background_jobs(){
 void Job_Control::connect_processes(int no_of_pipes, const std::vector<std::vector<int>>& pipefds, const int& proc_index, const int& total_proc){
 
     if(no_of_pipes > 0){
-
         if(proc_index == 0){
             dup2(pipefds[proc_index][writeindex], STDOUT_FILENO);
             close(pipefds[proc_index][readindex]);
