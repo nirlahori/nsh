@@ -18,7 +18,7 @@ struct background_execution_unit{
     std::size_t job_id;
     std::string job_cmd;
     job_status status;
-    std::size_t pgid;
+    int pgid;
 };
 
 

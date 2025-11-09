@@ -17,16 +17,11 @@
 #include "execution/internal/job_control_impl.hpp"
 
 
-namespace builtin {
-
-
 struct builtin_base{
 
 public:
     builtin_base() = default;
-    virtual void parse(std::list<std::string>&) = 0;
     virtual void invoke(std::list<std::string>&, std::map<std::size_t, background_execution_unit>&) = 0;
-
     virtual ~builtin_base(){}
 
 };
@@ -34,8 +29,7 @@ public:
 struct builtin_exit : public builtin_base{
 
     builtin_exit() : builtin_base() {}
-    void parse(std::list<std::string>& tokens){}
-    void invoke(std::list<std::string>& arglist, std::map<std::size_t, background_execution_unit>& bgjob_table){
+    void invoke(std::list<std::string>& arglist,  [[maybe_unused]] std::map<std::size_t, background_execution_unit>& bgjob_table){
         if(arglist.empty())
             std::exit(0); // Need to exit with status of last executed command
         std::exit(std::stoi(arglist.front()));
@@ -50,8 +44,7 @@ private:
 
 public:
     builtin_cd() : builtin_base() {}
-    void parse(std::list<std::string>& tokens){}
-    void invoke(std::list<std::string>& arglist, std::map<std::size_t, background_execution_unit>& bgjob_table){
+    void invoke(std::list<std::string>& arglist, [[maybe_unused]] std::map<std::size_t, background_execution_unit>& bgjob_table){
         if(arglist.empty() || arglist.front().c_str() == home_char){
             char* cwd {getenv("HOME")};
             if(chdir((cwd) ? cwd : "/") == -1){
@@ -72,7 +65,7 @@ struct builtin_kill : public builtin_base{
 
     builtin_kill() : builtin_base() {}
 
-    using signal_t = unsigned int;
+    using signal_t = int;
     using process_ids_t = std::vector<unsigned int>;
     std::pair<signal_t, process_ids_t> kill_ctx;
 
@@ -86,7 +79,6 @@ struct builtin_kill : public builtin_base{
 
     bool expect_jobid(const std::string& token){
 
-        std::size_t jobid_tokill {0};
         if(token.starts_with("%")){
             try{
                 jobids.push_back(std::stoi(token.substr(1)));
@@ -101,7 +93,7 @@ struct builtin_kill : public builtin_base{
     bool expect_signal(const std::string& signal){
         try{
             kill_ctx.first = std::stoi(signal);
-            if(kill_ctx.first < 0 && kill_ctx.first > SIGRTMAX)
+            if(kill_ctx.first < 0 || kill_ctx.first > SIGRTMAX)
                 return false;
         }
         catch(...){
@@ -187,7 +179,6 @@ struct builtin_kill : public builtin_base{
 
 struct builtin_jobs : public builtin_base{
     builtin_jobs() : builtin_base() {}
-    void parse(std::list<std::string>& tokens){}
     void invoke(std::list<std::string>&, std::map<std::size_t, background_execution_unit>& bgjob_table){
 
         for(const auto& [jobid, execunit] : bgjob_table){
@@ -211,8 +202,11 @@ struct builtin_fg : public builtin_base{
         return tcsetpgrp(STDIN_FILENO, pgrp);
     }
 
-    void parse(std::list<std::string>&){}
     void invoke(std::list<std::string>& arglist, std::map<std::size_t, background_execution_unit>& bgjob_table){
+
+        if(bgjob_table.empty()){
+            return;
+        }
 
         if(arglist.empty()){
             auto iter = std::prev(bgjob_table.end());
@@ -291,8 +285,6 @@ struct builtin_fg : public builtin_base{
                 std::printf("Error executing fg: No such job\n");
             }
         }
-
-
     }
 
     ~builtin_fg(){}
@@ -303,9 +295,10 @@ struct builtin_fg : public builtin_base{
 struct builtin_bg : public builtin_base{
     builtin_bg() : builtin_base() {}
 
-    void parse(std::list<std::string>&){}
-
     void invoke(std::list<std::string>& arglist, std::map<std::size_t, background_execution_unit>& bgjob_table){
+        if(bgjob_table.empty()){
+            return;
+        }
         if(arglist.empty()){
             auto iter = bgjob_table.find(bgjob_table.size());
             killpg(iter->second.pgid, SIGCONT);
@@ -334,35 +327,53 @@ struct builtin_bg : public builtin_base{
     }
 };
 
+struct Builtin_Table{
 
+    using builtin_table_type =  std::map<std::string, std::unique_ptr<builtin_base>>;
+    builtin_table_type builtin_map{};
 
+private:
 
-
-using builtin_name_type = std::string;
-
-
-std::map<builtin_name_type, std::unique_ptr<builtin_base>> builtin_map{};
-
-
-void init_builtin_map(){
-    builtin_map.insert({"exit", std::make_unique<builtin_exit>()});
-    builtin_map.insert({"cd", std::make_unique<builtin_cd>()});
-    builtin_map.insert({"kill", std::make_unique<builtin_kill>()});
-    builtin_map.insert({"jobs", std::make_unique<builtin_jobs>()});
-    builtin_map.insert({"fg", std::make_unique<builtin_fg>()});
-    builtin_map.insert({"bg", std::make_unique<builtin_bg>()});
-}
-
-
-bool is_builtin(const std::string& cmd){
-    return builtin_map.find(cmd) != builtin_map.end();
-}
-
-void execute(const std::string& cmd, std::list<std::string>& arglist, std::map<std::size_t, background_execution_unit>& bgjob_table){
-    if(is_builtin(cmd)){
-        builtin_map[cmd]->invoke(arglist, bgjob_table);
+    Builtin_Table(){
+        builtin_map.insert({"exit", std::make_unique<builtin_exit>()});
+        builtin_map.insert({"cd", std::make_unique<builtin_cd>()});
+        builtin_map.insert({"kill", std::make_unique<builtin_kill>()});
+        builtin_map.insert({"jobs", std::make_unique<builtin_jobs>()});
+        builtin_map.insert({"fg", std::make_unique<builtin_fg>()});
+        builtin_map.insert({"bg", std::make_unique<builtin_bg>()});
     }
-}
-}
+
+public:
+    static Builtin_Table& get_instance() noexcept {
+        static Builtin_Table builtin_table {};
+        return builtin_table;
+    }
+
+    const builtin_table_type& get_table() const noexcept  {
+        return builtin_map;
+    }
+
+    bool is_builtin(const std::string& cmd) const noexcept {
+        return builtin_map.find(cmd) != builtin_map.end();
+    }
+
+    void execute(const std::string& cmd, std::list<std::string>& arglist, std::map<std::size_t, background_execution_unit>& bgjob_table) const{
+        if(is_builtin(cmd)){
+            builtin_map.at(cmd)->invoke(arglist, bgjob_table);
+        }
+    }
+};
+
+
+
+// void init_builtin_map(){
+//     builtin_map.insert({"exit", std::make_unique<builtin_exit>()});
+//     builtin_map.insert({"cd", std::make_unique<builtin_cd>()});
+//     builtin_map.insert({"kill", std::make_unique<builtin_kill>()});
+//     builtin_map.insert({"jobs", std::make_unique<builtin_jobs>()});
+//     builtin_map.insert({"fg", std::make_unique<builtin_fg>()});
+//     builtin_map.insert({"bg", std::make_unique<builtin_bg>()});
+// }
+
 
 #endif // BUILTIN_HPP

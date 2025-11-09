@@ -5,7 +5,7 @@
 #include <cstdio>
 #include <csignal>
 
-#include "../../include/execution/job_control.hpp"
+#include "execution/job_control.hpp"
 
 class Command_Execution
 {

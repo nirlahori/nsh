@@ -1,7 +1,7 @@
-#include "../include/execution/command_execution.hpp"
+#include "execution/command_execution.hpp"
 
 
-int main(int argc, char* argv[]){
+int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]){
 
 
     Command_Execution cmdexec;

@@ -9,23 +9,30 @@ project(nsh LANGUAGES CXX)
 #set(CMAKE_AUTORCC ON)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_FLAGS "-ggdb -fsanitize=address")
-
 
 set (SRCS
     src/main.cpp
+    src/execution/command_execution.cpp
+    src/execution/job_control.cpp
+    # tokens.hpp
+    # command_struct.hpp
+    # parse_input.hpp
+    # word_control.hpp
+    # execution/command_execution.hpp
+    # include/builtin.hpp
+    # system_envs.hpp
+    # c_array.hpp
+    # execution/job_control.hpp src/execution/job_control.cpp
+    # execution/internal/job_control_impl.hpp
 )
 
-
 add_executable(${CMAKE_PROJECT_NAME} ${SRCS}
-    include/tokens.hpp
-    include/command_struct.hpp
-    include/parse_input.hpp
-    include/word_control.hpp
-    src/execution/command_execution.cpp include/execution/command_execution.hpp
-    include/builtin.hpp
     README.md
-    include/system_envs.hpp
-    include/c_array.hpp
-    include/execution/job_control.hpp src/execution/job_control.cpp
-    include/execution/internal/job_control_impl.hpp)
+
+)
+
+target_include_directories(${CMAKE_PROJECT_NAME} PUBLIC "include/")
+target_compile_options(${CMAKE_PROJECT_NAME} PUBLIC "-ggdb" "-fsanitize=address" "-fsanitize=undefined" "-Wall" "-Wextra" "-Werror")
+target_link_options(${CMAKE_PROJECT_NAME} PUBLIC "-ggdb" "-fsanitize=address" "-fsanitize=undefined" "-Wall" "-Wextra" "-Werror")
+
+

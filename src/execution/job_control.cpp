@@ -4,11 +4,8 @@
 #include <string_view>
 #include <cstring>
 
-#include "../../include/execution/job_control.hpp"
-#include "../../include/builtin.hpp"
-
-
-
+#include "execution/job_control.hpp"
+#include "builtin.hpp"
 
 
 Job_Control::Job_Control() :
@@ -23,12 +20,10 @@ Job_Control::Job_Control() :
             // Cannot proceed forward in case of error in getting directory list in $PATH
             std::exit(EXIT_FAILURE);
         }
-
-        builtin::init_builtin_map();
     }
 
 
-void Job_Control::set_foreground_pgid(std::size_t pgid){
+void Job_Control::set_foreground_pgid(int pgid){
 
     if(pgid != shell_pgid){
         tcsetpgrp(STDIN_FILENO, pgid);
@@ -44,26 +39,104 @@ void Job_Control::set_foreground_pgid(std::size_t pgid){
     }
 }
 
-// void Job_Control::handle_sigint(Job_Control *job_context){
+void Job_Control::execute_bg_job(job_type job){
+
+    static std::vector<char*> argsptrs;
+    static std::vector<std::string> envstrs;
+    static std::vector<char*> envptrs;
+
+    int newpgrpid {0};
+    std::size_t no_of_pipes {0};
+    char filepath[1024];
+
+    jobunit_id++;
+    no_of_pipes = job.size() - 1;
+
+    static std::vector<std::vector<int>> pipevec(no_of_pipes);
+    if(no_of_pipes > pipevec.size()){
+        pipevec.resize(no_of_pipes, std::vector<int>(2));
+    }
 
 
+    for(auto& pipefds : pipevec){
+        if(pipe(pipefds.data())){
+            std::perror("Error");
+            continue;
+        }
+    }
+
+    std::size_t proc_index {0};
+    std::size_t total_procs {job.size()};
+
+    for(command_info& curr_proc : job){
+
+        int pid = fork();
+        if(pid == 0){
+            connect_processes(no_of_pipes, pipevec, proc_index, total_procs);
+
+            argsptrs.reserve(curr_proc.cmdargs.size() + 2);
+            if(!arglist.get_cmdline_opt_args(std::move(curr_proc.cmdargs), curr_proc.execfile, argsptrs)){
+                // Terminate the process after cleaning up
+                std::terminate();
+            }
+            envstrs.reserve(curr_proc.envs.size());
+            envptrs.reserve(curr_proc.envs.size() + 1);
+            if(!arglist.get_cmdline_env_args(std::move(curr_proc.envs), envstrs, envptrs)){
+                // Terminate the process after cleaning up
+                std::terminate();
+            }
+
+            for(const std::string& path : path_dirs){
+                std::string str (path + ((path.ends_with("/")) ? curr_proc.execfile : "/" + curr_proc.execfile));
+                std::strncpy(filepath, str.c_str(), str.size() + 1);
+                execve(filepath, argsptrs.data(), envptrs.data());
+                std::memset(filepath, '\0', std::strlen(filepath));
+            }
+            std::perror("Error");
+            std::exit(EXIT_FAILURE);
+        }
+        else{
+
+            if(proc_index == 0){
+                newpgrpid = pid;
+                if(newpgrpid < 0){
+                    std::perror("Error");
+                }
+            }
+            if(setpgid(pid, newpgrpid) < 0){
+                std::perror("Error");
+            }
+            // Print the status of the job
+        }
+        proc_index++;
+    }
 
 
-// }
+    background_execution_unit unit {jobunit_id, get_jobunit_desc(job), job_status::running, newpgrpid};
+    bgjob_table.insert({unit.job_id, std::move(unit)});
 
-// void Job_Control::handle_interrupt(int signum, siginfo_t *info, void *context){
+    for(std::size_t i{0}; i<no_of_pipes; ++i){
+        /*close(pipefds[i][readindex]);
+        close(pipefds[i][writeindex]);*/
+        close(pipevec[i][readindex]);
+        close(pipevec[i][writeindex]);
+    }
 
-//     switch (signum){
-//     case SIGINT:
-
-
-//         break;
-//     default:
-//         break;
-//     }
-
-// }
-
+    siginfo_t waitinfo;
+    waitinfo.si_pid = 0;
+    for(std::size_t m{0}; m<total_procs; ++m){
+        int status = waitid(P_PGID, newpgrpid, &waitinfo, WNOHANG | WEXITED | WSTOPPED);
+        if(status == 0){
+            if(waitinfo.si_pid == 0){
+                break;
+            }
+        }
+        else{
+            std::perror("Unknown error occurred\n");
+            break;
+        }
+    }
+}
 
 
 bool Job_Control::tokenize_path_var(std::list<std::string>& path_dirs){
@@ -75,11 +148,12 @@ bool Job_Control::tokenize_path_var(std::list<std::string>& path_dirs){
     if(!path_env_val)
         return false;
 
-    char path_dir_toks[std::strlen(path_env_val) + 1];
+    std::string path_dir_toks;
+    path_dir_toks.resize(std::strlen(path_env_val) + 1);
 
-    memcpy(path_dir_toks, path_env_val, std::strlen(path_env_val) + 1);
+    std::copy(path_env_val, path_env_val + std::strlen(path_env_val) + 1, path_dir_toks.begin());
 
-    char* tok {std::strtok(path_dir_toks, delim.data())};
+    char* tok {std::strtok(path_dir_toks.data(), delim.data())};
     while(tok){
         path_dirs.push_back(std::string(tok));
         tok = std::strtok(nullptr, delim.data());
@@ -93,21 +167,31 @@ void Job_Control::submit_foreground_jobs(const std::list<job_type>& _fg_jobs){
 
 void Job_Control::run_foreground_jobs(){
 
+    static std::vector<char*> argsptrs;
+    static std::vector<std::string> envstrs;
+    static std::vector<char*> envptrs;
+
     std::size_t chainlist_size {fg_joblist.size()};
-    std::size_t newpgrpid {0};
+    int newpgrpid {0};
     std::size_t no_of_pipes {0};
+
+    static std::vector<std::vector<int>> pipevec;
 
     char filepath[1024];
     bool all_builtins {true};
+
+    Builtin_Table& builtin_table {Builtin_Table::get_instance()};
 
     for(std::size_t index{0}; index<chainlist_size; ++index){
         std::list<command_info>& chain_key = *std::next(fg_joblist.begin(), index);
         std::size_t chain_key_size = chain_key.size();
         no_of_pipes = chain_key_size - 1;
-        int pipefds[no_of_pipes][2];
 
-        for(std::size_t k{0}; k<no_of_pipes; ++k){
-            if(pipe(pipefds[k]) == -1){
+        if(no_of_pipes > pipevec.size()){
+            pipevec.resize(no_of_pipes, std::vector<int>(2));
+        }
+        for(auto& pipefds : pipevec){
+            if(pipe(pipefds.data())){
                 std::perror("Error");
                 continue;
             }
@@ -119,9 +203,9 @@ void Job_Control::run_foreground_jobs(){
 
             command_info& curr_proc {*std::next(chain_key.begin(), j)};
 
-            if(builtin::is_builtin(curr_proc.execfile)){
+            if(builtin_table.is_builtin(curr_proc.execfile)){
                 std::list<std::string> arglist (curr_proc.cmdargs.begin(), curr_proc.cmdargs.end());
-                builtin::execute(curr_proc.execfile, arglist, bgjob_table);
+                builtin_table.execute(curr_proc.execfile, arglist, bgjob_table);
                 continue;
             }
             all_builtins = false;
@@ -129,16 +213,25 @@ void Job_Control::run_foreground_jobs(){
             int pid = fork();
             if(pid == 0){
 
-                connect_processes(no_of_pipes, pipefds, j, chain_key_size);
+                //connect_processes(no_of_pipes, pipefds, j, chain_key_size);
+                connect_processes(no_of_pipes, pipevec, j, chain_key_size);
 
-                char** procargs = arglist.get_cmdline_opt_args(curr_proc.cmdargs, curr_proc.execfile);
-                char** procenvs = arglist.get_cmdline_env_args(curr_proc.envs);
+                argsptrs.reserve(curr_proc.cmdargs.size() + 2);
+                if(!arglist.get_cmdline_opt_args(std::move(curr_proc.cmdargs), curr_proc.execfile, argsptrs)){
+                    break;
+                }
 
+                envstrs.reserve(curr_proc.envs.size());
+                envptrs.reserve(curr_proc.envs.size() + 1);
+                if(!arglist.get_cmdline_env_args(std::move(curr_proc.envs), envstrs, envptrs)){
+                    break;
+                }
 
                 for(const std::string& path : path_dirs){
                     std::string str (path + ((path.ends_with("/")) ? curr_proc.execfile : "/" + curr_proc.execfile));
                     std::strncpy(filepath, str.c_str(), str.size() + 1);
-                    execve(filepath, procargs, procenvs);
+                    //execve(filepath, procargs, procenvs);
+                    execve(filepath, argsptrs.data(), envptrs.data());
                     std::memset(filepath, '\0', std::strlen(filepath));
                 }
                 std::perror("Error");
@@ -162,16 +255,18 @@ void Job_Control::run_foreground_jobs(){
 
         set_foreground_pgid(newpgrpid);
 
-        for(int i{0}; i<no_of_pipes; ++i){
-            close(pipefds[i][readindex]);
-            close(pipefds[i][writeindex]);
+        for(std::size_t i{0}; i<no_of_pipes; ++i){
+            /*close(pipefds[i][readindex]);
+            close(pipefds[i][writeindex]);*/
+            close(pipevec[i][readindex]);
+            close(pipevec[i][writeindex]);
         }
 
         siginfo_t proc_exit_status_info;
         proc_exit_status_info.si_pid = 0;
 
         if(!all_builtins){
-            for(int m{0}; m<chain_key_size; ++m){
+            for(std::size_t m{0}; m<chain_key_size; ++m){
                 if(waitid(P_PGID, newpgrpid, &proc_exit_status_info, WEXITED | WSTOPPED) == -1){
                     std::perror("Error");
                 }
@@ -181,8 +276,8 @@ void Job_Control::run_foreground_jobs(){
     }
 }
 
-void Job_Control::submit_background_jobs(const std::list<job_type>& _bg_jobs){
-    bg_joblist = _bg_jobs;
+void Job_Control::submit_background_jobs(std::list<job_type> bg_jobs){
+    bg_joblist = std::move(bg_jobs);
 }
 
 
@@ -210,92 +305,16 @@ std::string Job_Control::get_jobunit_desc(const job_type& job){
 
 void Job_Control::run_background_jobs(){
 
-    //std::size_t chainlist_size {bg_joblist.size()};
-    std::size_t newpgrpid {0};
-    std::size_t no_of_pipes {0};
 
-    char filepath[1024];
+    auto first {std::make_move_iterator(bg_joblist.begin())};
+    auto last {std::make_move_iterator(bg_joblist.end())};
 
-    for(const job_type& job : bg_joblist){
-
-        jobunit_id++;
-        no_of_pipes = job.size() - 1;
-
-        int pipefds[no_of_pipes][2];
-
-        for(std::size_t k{0}; k<no_of_pipes; ++k){
-            if(pipe(pipefds[k]) == -1){
-                std::perror("Error");
-                continue;
-            }
-        }
-
-        std::size_t proc_index {0};
-        std::size_t total_procs {job.size()};
-        for(const command_info& curr_proc : job){
-
-            int pid = fork();
-            if(pid == 0){
-                connect_processes(no_of_pipes, pipefds, proc_index, total_procs);
-
-                char** procargs = arglist.get_cmdline_opt_args(curr_proc.cmdargs, curr_proc.execfile);
-                char** procenvs = arglist.get_cmdline_env_args(curr_proc.envs);
-
-                for(const std::string& path : path_dirs){
-                    std::string str (path + ((path.ends_with("/")) ? curr_proc.execfile : "/" + curr_proc.execfile));
-                    std::strncpy(filepath, str.c_str(), str.size() + 1);
-                    execve(filepath, procargs, procenvs);
-                    std::memset(filepath, '\0', std::strlen(filepath));
-                }
-                std::perror("Error");
-                std::exit(EXIT_FAILURE);
-            }
-            else{
-
-                if(proc_index == 0){
-                    newpgrpid = pid;
-                    if(newpgrpid < 0){
-                        std::perror("Error");
-                    }
-                }
-                if(setpgid(pid, newpgrpid) < 0){
-                    std::perror("Error");
-                }
-                // Print the status of the job
-            }
-            proc_index++;
-        }
-
-
-        background_execution_unit unit {jobunit_id, get_jobunit_desc(job), job_status::running, newpgrpid};
-        bgjob_table.insert({unit.job_id, std::move(unit)});
-
-        for(int i{0}; i<no_of_pipes; ++i){
-            close(pipefds[i][readindex]);
-            close(pipefds[i][writeindex]);
-        }
-
-        siginfo_t waitinfo;
-        waitinfo.si_pid = 0;
-        for(int m{0}; m<total_procs; ++m){
-            int status = waitid(P_PGID, newpgrpid, &waitinfo, WNOHANG | WEXITED | WSTOPPED);
-            if(status < 0){
-                // Handle error properly
-            }
-            else if(status == 0){
-                if(waitinfo.si_pid == 0){
-                    break;
-                }
-            }
-            else{
-                std::perror("unknown error occurred\n");
-                break;
-            }
-        }
+    for(; first != last; first = std::next(first)){
+        execute_bg_job(*first);
     }
 }
 
-void Job_Control::connect_processes(int no_of_pipes, int pipefds[][2], const int& proc_index, const int& total_proc){
+void Job_Control::connect_processes(int no_of_pipes, const std::vector<std::vector<int>>& pipefds, const int& proc_index, const int& total_proc){
 
     if(no_of_pipes > 0){
 
@@ -347,7 +366,6 @@ void Job_Control::connect_processes(int no_of_pipes, int pipefds[][2], const int
                 close(pipefds[pfd][writeindex]);
             }
         }
-
     }
 }
 

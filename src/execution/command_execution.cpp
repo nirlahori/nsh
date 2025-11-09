@@ -9,11 +9,11 @@
 #include <sys/wait.h>
 #include <fcntl.h>
 
-#include "../../include/tokens.hpp"
-#include "../../include/parse_input.hpp"
-#include "../../include/word_control.hpp"
-#include "../../include/system_envs.hpp"
-#include "../../include/execution/command_execution.hpp"
+#include "tokens.hpp"
+#include "parse_input.hpp"
+#include "word_control.hpp"
+#include "system_envs.hpp"
+#include "execution/command_execution.hpp"
 
 sig_atomic_t Command_Execution::sigflag = 0;
 
@@ -29,7 +29,7 @@ Command_Execution::Command_Execution() :
         sigflag = 0;
 
         // Setup signal handling
-        struct sigaction sa_intr, sa_tstp;
+        struct sigaction sa_intr;
 
         sa_intr.sa_flags = SA_SIGINFO;
         if(sigemptyset(&sa_intr.sa_mask) < 0){
@@ -40,9 +40,7 @@ Command_Execution::Command_Execution() :
         set_signal(sa_intr, SIGINT, handle_interrupt, sa_sigaction);
     }
 
-void Command_Execution::handle_interrupt(int signum, siginfo_t *info, void *context){
-
-    std::printf("Signal %d caught\n", signum);
+void Command_Execution::handle_interrupt(int signum, [[maybe_unused]] siginfo_t *info, [[maybe_unused]] void *context){
 
     switch(signum){
         case SIGINT:
@@ -71,7 +69,7 @@ void Command_Execution::start_loop(){
 
     std::string shell_cwd(1024, '\0'), shell_prompt;
 
-    char filepath[1024];
+    //char filepath[1024];
 
     if(getcwd(shell_cwd.data(), 1024) != nullptr){
         shell_prompt = prompt_fmt + shell_cwd.c_str() + prompt_suffix;
@@ -137,7 +135,7 @@ void Command_Execution::start_loop(){
 
         int bg_job_start_index {-1};
         int index {0};
-        if(std::all_of(line_tokens.begin(), line_tokens.end(), [&bg_job_start_index](std::list<std::string>& elem){
+        if(std::all_of(line_tokens.begin(), line_tokens.end(), [](std::list<std::string>& elem){
                 auto last_token = elem.back();
                 //auto start_pos = last_token.find_first_not_of(' ');
                 auto end_pos = last_token.find_last_not_of(' ');
@@ -163,7 +161,7 @@ void Command_Execution::start_loop(){
 
 
         if(bg_job_start_index > -1){
-            bool check_bg_job_syntax = std::all_of(std::next(line_tokens.begin(), bg_job_start_index), line_tokens.end(), [&bg_job_start_index](const std::list<std::string>& elem){
+            bool check_bg_job_syntax = std::all_of(std::next(line_tokens.begin(), bg_job_start_index), line_tokens.end(), [](const std::list<std::string>& elem){
                 auto last_token = elem.back();
                 auto end_pos = last_token.find_last_not_of(' ');
                 if(last_token[end_pos] == '&'){
@@ -212,7 +210,7 @@ void Command_Execution::start_loop(){
         }
 
         control_unit.submit_foreground_jobs(fgjob_list);
-        control_unit.submit_background_jobs(bgjob_list);
+        control_unit.submit_background_jobs(std::move(bgjob_list));
 
 
         control_unit.run_foreground_jobs();

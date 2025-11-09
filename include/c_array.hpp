@@ -45,7 +45,19 @@ public:
     }
 
 
-    char** get_cmdline_opt_args(const std::vector<std::string>& cmdargs, const std::string& filename) noexcept{
+    bool get_cmdline_opt_args(std::vector<std::string> cmdargs, /*const*/ std::string& filename, std::vector<char*>& argsptrs) noexcept{
+
+        unsigned int index {0};
+        argsptrs[index++] = filename.data();
+        for(auto& str : cmdargs){
+            argsptrs[index++] = str.data();
+        }
+        argsptrs[index] = nullptr;
+        return true;
+    }
+
+
+/*   char** get_cmdline_opt_args(const std::vector<std::string>& cmdargs, const std::string& filename) noexcept{
 
         int index{0};
         std::strncpy(c_strs_options[index++], filename.c_str(), filename.length() + 1);
@@ -66,9 +78,9 @@ public:
         c_strs_options[index] = nullptr;
         null_opt_index = index;
         return c_strs_options;
-    }
+    }*/
 
-    char** get_cmdline_env_args(const std::map<std::string, std::string>& envmap){
+    /*char** get_cmdline_env_args(const std::map<std::string, std::string>& envmap){
 
         int index{0};
         for(const auto& [name, value] : envmap){
@@ -80,12 +92,26 @@ public:
         c_strs_envs[index] = nullptr;
         null_env_index = index;
         return c_strs_envs;
+    }*/
+
+
+    bool get_cmdline_env_args(std::map<std::string, std::string> envmap, std::vector<std::string>&  envargs, std::vector<char*>& envptrs){
+
+        int index{0};
+        for(const auto& [name, value] : envmap){
+            std::string str (name + "=" + value);
+            envargs[index] = std::move(str);
+            envptrs[index] = envargs[index].data();
+            index++;
+        }
+        envptrs[index] = nullptr;
+        return true;
     }
 
 
-    char** get_cmdline_opt_args(){
-        return c_strs_options;
-    }
+    // char** get_cmdline_opt_args(){
+    //     return c_strs_options;
+    // }
 
     char** get_cmdline_env_args(){
         return c_strs_envs;

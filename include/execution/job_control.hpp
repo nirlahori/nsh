@@ -10,8 +10,8 @@
 #include <unistd.h>
 #include <sys/wait.h>
 
-#include "../command_struct.hpp"
-#include "../c_array.hpp"
+#include "command_struct.hpp"
+#include "c_array.hpp"
 #include "internal/job_control_impl.hpp"
 
 
@@ -19,7 +19,7 @@ class Job_Control
 {
 
     bool tokenize_path_var(std::list<std::string>& path_dirs);
-    void set_foreground_pgid(std::size_t pgid);
+    void set_foreground_pgid(int pgid);
 
     std::map<std::size_t, background_execution_unit> bgjob_table;
     std::size_t jobunit_id;
@@ -41,20 +41,22 @@ class Job_Control
 
     void handle(int, siginfo_t*, void*);
 
+    void execute_bg_job(job_type);
+
+
 public:
     void submit_foreground_jobs(const std::list<job_type>& _fg_jobs);
     void run_foreground_jobs();
 
-    void submit_background_jobs(const std::list<job_type>& _bg_jobs);
+    void submit_background_jobs(std::list<job_type> bg_jobs);
     void run_background_jobs();
 
     std::string get_jobunit_desc(const job_type& job);
-    void connect_processes(int _no_of_pipes, int pipefd[][2], const int& proc_index, const int& total_proc);
+    void connect_processes(int no_of_pipes, const std::vector<std::vector<int>>& pipefds, const int& proc_index, const int& total_proc);
 
     void wait_for_background_jobs();
     bool kill_foreground_job();
     bool stop_foreground_job();
-
 
 public:
     Job_Control();
