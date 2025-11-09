@@ -22,6 +22,29 @@ Job_Control::Job_Control() :
         }
     }
 
+bool Job_Control::get_cmdline_opt_args(std::vector<std::string> cmdargs, /*const*/ std::string& filename, std::vector<char*>& argsptrs) noexcept{
+
+    unsigned int index {0};
+    argsptrs[index++] = filename.data();
+    for(auto& str : cmdargs){
+        argsptrs[index++] = str.data();
+    }
+    argsptrs[index] = nullptr;
+    return true;
+}
+
+bool Job_Control::get_cmdline_env_args(std::map<std::string, std::string> envmap, std::vector<std::string>&  envargs, std::vector<char*>& envptrs){
+
+    int index{0};
+    for(const auto& [name, value] : envmap){
+        std::string str (name + "=" + value);
+        envargs[index] = std::move(str);
+        envptrs[index] = envargs[index].data();
+        index++;
+    }
+    envptrs[index] = nullptr;
+    return true;
+}
 
 void Job_Control::set_foreground_pgid(int pgid){
 
@@ -38,6 +61,8 @@ void Job_Control::set_foreground_pgid(int pgid){
         }
     }
 }
+
+
 
 void Job_Control::execute_bg_job(job_type job){
 
@@ -75,13 +100,13 @@ void Job_Control::execute_bg_job(job_type job){
             connect_processes(no_of_pipes, pipevec, proc_index, total_procs);
 
             argsptrs.reserve(curr_proc.cmdargs.size() + 2);
-            if(!arglist.get_cmdline_opt_args(std::move(curr_proc.cmdargs), curr_proc.execfile, argsptrs)){
+            if(!get_cmdline_opt_args(std::move(curr_proc.cmdargs), curr_proc.execfile, argsptrs)){
                 // Terminate the process after cleaning up
                 std::terminate();
             }
             envstrs.reserve(curr_proc.envs.size());
             envptrs.reserve(curr_proc.envs.size() + 1);
-            if(!arglist.get_cmdline_env_args(std::move(curr_proc.envs), envstrs, envptrs)){
+            if(!get_cmdline_env_args(std::move(curr_proc.envs), envstrs, envptrs)){
                 // Terminate the process after cleaning up
                 std::terminate();
             }
@@ -217,13 +242,13 @@ void Job_Control::run_foreground_jobs(){
                 connect_processes(no_of_pipes, pipevec, j, chain_key_size);
 
                 argsptrs.reserve(curr_proc.cmdargs.size() + 2);
-                if(!arglist.get_cmdline_opt_args(std::move(curr_proc.cmdargs), curr_proc.execfile, argsptrs)){
+                if(!get_cmdline_opt_args(std::move(curr_proc.cmdargs), curr_proc.execfile, argsptrs)){
                     break;
                 }
 
                 envstrs.reserve(curr_proc.envs.size());
                 envptrs.reserve(curr_proc.envs.size() + 1);
-                if(!arglist.get_cmdline_env_args(std::move(curr_proc.envs), envstrs, envptrs)){
+                if(!get_cmdline_env_args(std::move(curr_proc.envs), envstrs, envptrs)){
                     break;
                 }
 

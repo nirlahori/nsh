@@ -14,16 +14,6 @@ set (SRCS
     src/main.cpp
     src/execution/command_execution.cpp
     src/execution/job_control.cpp
-    # tokens.hpp
-    # command_struct.hpp
-    # parse_input.hpp
-    # word_control.hpp
-    # execution/command_execution.hpp
-    # include/builtin.hpp
-    # system_envs.hpp
-    # c_array.hpp
-    # execution/job_control.hpp src/execution/job_control.cpp
-    # execution/internal/job_control_impl.hpp
 )
 
 add_executable(${CMAKE_PROJECT_NAME} ${SRCS}

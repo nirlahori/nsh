@@ -11,7 +11,6 @@
 #include <sys/wait.h>
 
 #include "command_struct.hpp"
-#include "c_array.hpp"
 #include "internal/job_control_impl.hpp"
 
 
@@ -20,6 +19,9 @@ class Job_Control
 
     bool tokenize_path_var(std::list<std::string>& path_dirs);
     void set_foreground_pgid(int pgid);
+
+    bool get_cmdline_opt_args(std::vector<std::string> cmdargs, std::string& filename, std::vector<char*>& argsptrs) noexcept;
+    bool get_cmdline_env_args(std::map<std::string, std::string> envmap, std::vector<std::string>&  envargs, std::vector<char*>& envptrs);
 
     std::map<std::size_t, background_execution_unit> bgjob_table;
     std::size_t jobunit_id;
@@ -35,7 +37,6 @@ class Job_Control
     int shell_pgid;
 
     bool single_proc_flag {false};
-    c_array arglist;
 
     std::list<std::string> path_dirs;
 
