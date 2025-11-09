@@ -3,6 +3,7 @@
 #include <string>
 #include <string_view>
 #include <cstring>
+#include <filesystem>
 
 #include "execution/job_control.hpp"
 #include "builtin.hpp"
@@ -22,7 +23,7 @@ Job_Control::Job_Control() :
         }
     }
 
-bool Job_Control::get_cmdline_opt_args(std::vector<std::string> cmdargs, /*const*/ std::string& filename, std::vector<char*>& argsptrs) noexcept{
+bool Job_Control::get_cmdline_opt_args(std::vector<std::string> cmdargs, std::string& filename, std::vector<char*>& argsptrs) noexcept{
 
     unsigned int index {0};
     argsptrs[index++] = filename.data();
@@ -72,7 +73,6 @@ void Job_Control::execute_bg_job(job_type job){
 
     int newpgrpid {0};
     std::size_t no_of_pipes {0};
-    char filepath[1024];
 
     jobunit_id++;
     no_of_pipes = job.size() - 1;
@@ -101,21 +101,21 @@ void Job_Control::execute_bg_job(job_type job){
 
             argsptrs.reserve(curr_proc.cmdargs.size() + 2);
             if(!get_cmdline_opt_args(std::move(curr_proc.cmdargs), curr_proc.execfile, argsptrs)){
-                // Terminate the process after cleaning up
-                std::terminate();
+                break;
             }
             envstrs.reserve(curr_proc.envs.size());
             envptrs.reserve(curr_proc.envs.size() + 1);
             if(!get_cmdline_env_args(std::move(curr_proc.envs), envstrs, envptrs)){
-                // Terminate the process after cleaning up
-                std::terminate();
+                break;
             }
 
-            for(const std::string& path : path_dirs){
-                std::string str (path + ((path.ends_with("/")) ? curr_proc.execfile : "/" + curr_proc.execfile));
-                std::strncpy(filepath, str.c_str(), str.size() + 1);
-                execve(filepath, argsptrs.data(), envptrs.data());
-                std::memset(filepath, '\0', std::strlen(filepath));
+
+            std::filesystem::path binary_file;
+            std::move_iterator<std::list<std::string>::iterator> first{path_dirs.begin()}, last{path_dirs.end()};
+            for(; first != last; first = std::next(first)){
+                binary_file = *first;
+                binary_file.append(curr_proc.execfile);
+                execve(binary_file.string().c_str(), argsptrs.data(), envptrs.data());
             }
             std::perror("Error");
             std::exit(EXIT_FAILURE);
@@ -141,8 +141,6 @@ void Job_Control::execute_bg_job(job_type job){
     bgjob_table.insert({unit.job_id, std::move(unit)});
 
     for(std::size_t i{0}; i<no_of_pipes; ++i){
-        /*close(pipefds[i][readindex]);
-        close(pipefds[i][writeindex]);*/
         close(pipevec[i][readindex]);
         close(pipevec[i][writeindex]);
     }
@@ -202,7 +200,6 @@ void Job_Control::run_foreground_jobs(){
 
     static std::vector<std::vector<int>> pipevec;
 
-    char filepath[1024];
     bool all_builtins {true};
 
     Builtin_Table& builtin_table {Builtin_Table::get_instance()};
@@ -252,12 +249,12 @@ void Job_Control::run_foreground_jobs(){
                     break;
                 }
 
-                for(const std::string& path : path_dirs){
-                    std::string str (path + ((path.ends_with("/")) ? curr_proc.execfile : "/" + curr_proc.execfile));
-                    std::strncpy(filepath, str.c_str(), str.size() + 1);
-                    //execve(filepath, procargs, procenvs);
-                    execve(filepath, argsptrs.data(), envptrs.data());
-                    std::memset(filepath, '\0', std::strlen(filepath));
+                std::filesystem::path binary_file;
+                std::move_iterator<std::list<std::string>::iterator> first{path_dirs.begin()}, last {path_dirs.end()};
+                for(; first != last; first = std::next(first)){
+                    binary_file = *first;
+                    binary_file.append(curr_proc.execfile);
+                    execve(binary_file.string().c_str(), argsptrs.data(), envptrs.data());
                 }
                 std::perror("Error");
                 std::exit(EXIT_FAILURE);
